@@ -1,0 +1,11 @@
+
+using System.Text.Json.Serialization;
+
+namespace {{namespac}}.Request
+{
+    public interface IApiRequest
+    {
+        [JsonIgnore]
+        public ApiEntryPointInfo ApiEntryPointInfo { get; set; }
+    }
+}

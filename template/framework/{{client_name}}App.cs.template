@@ -1,0 +1,10 @@
+namespace {{namespac}}
+{
+    public class {{client_name}}App
+    {
+        private const string DefaultGateway = "https://api.example.com";
+
+        public static readonly {{client_name}}App Default = new {{client_name}}App();
+        public string GatewayUrl { get; set; } = DefaultGateway;
+    }
+}

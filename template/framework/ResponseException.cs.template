@@ -1,0 +1,27 @@
+#nullable enable
+
+using System.Collections.Generic;
+
+namespace {{namespac}}.Exceptions
+{
+    [System.Serializable]
+    public class ResponseException : System.Exception
+    {
+        private string _message = string.Empty;
+        private int? _errorCode = default;
+
+        public string? ResponseContext;
+
+        public int? ErrorCode => _errorCode;
+        public override string Message => _message;
+
+        public ResponseException(string message, int errorCode)
+        {
+            _message = message;
+            _errorCode = errorCode;
+        }
+
+        public ResponseException(string message, System.Exception inner) 
+            : base(message, inner) {}
+    }
+}

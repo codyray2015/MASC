@@ -1,0 +1,217 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+using System.Diagnostics;
+using System.Net;
+using {{namespac}}.Exceptions;
+using {{namespac}}.Request;
+
+namespace {{namespac}}
+{
+    public class {{client_name}}ApiClient : IDisposable
+    {
+        private readonly {{client_name}}App _app;
+        private readonly HttpClient _httpClient;
+
+        public TimeSpan Timeout
+        {
+            get => _httpClient.Timeout;
+            set => _httpClient.Timeout = value;
+        }
+
+
+        public {{client_name}}ApiClient()
+            : this({{client_name}}App.Default)
+        {
+        }
+
+        public {{client_name}}ApiClient({{client_name}}App app)
+            : this(app, new HttpClient(new HttpClientHandler()
+            {
+                AutomaticDecompression = DecompressionMethods.All
+            }))
+        {
+        }
+
+        public {{client_name}}ApiClient({{client_name}}App app, HttpClient httpClient)
+        {
+            _app = app;
+            _httpClient = httpClient;
+        }
+
+        ///<exception cref="ApiResponseException"></exception>
+        ///<exception cref="HttpRequestException"></exception>
+        public async Task<T> SendRequestAsync<T>(IApiRequest request, CancellationToken cancellationToken = default)
+        {
+            var requestId = Guid.NewGuid();
+
+            var requestMessage = GetHttpRequestMessage(request, requestId, cancellationToken);
+
+
+            var responseMessage = await _httpClient.SendAsync(requestMessage, cancellationToken);
+
+            return await ResponseMessageHandler<T>(responseMessage, requestId, cancellationToken);
+        }
+
+        private async Task<T> ResponseMessageHandler<T>(HttpResponseMessage responseMessage, Guid requestId,
+            CancellationToken cancellationToken)
+        {
+            string resultStr;
+
+            if (!responseMessage.IsSuccessStatusCode)
+            {
+                resultStr = await responseMessage.Content.ReadAsStringAsync(cancellationToken);
+                PrintAtDebugMode($"[{requestId}] [Response] \n {resultStr}");
+                throw new ResponseException("unsuccessful status code", (int)responseMessage.StatusCode)
+                {
+                    ResponseContext = resultStr
+                };
+            }
+
+            if (typeof(T) == typeof(Stream))
+            {
+                return (T)(object)await responseMessage.Content.ReadAsStreamAsync(cancellationToken);
+            }
+
+            resultStr = await responseMessage.Content.ReadAsStringAsync(cancellationToken);
+            PrintAtDebugMode($"[{requestId}] [Response] \n {resultStr}");
+
+            if (typeof(T) == typeof(string))
+            {
+                return (T)(object)resultStr;
+            }
+
+            return JsonConvert.DeserializeObject<T>(resultStr);
+        }
+
+        private HttpRequestMessage GetHttpRequestMessage(IApiRequest request, Guid requestId,
+            CancellationToken cancellationToken = default)
+        {
+            ThrowIfNull(request.ApiEntryPointInfo, nameof(request.ApiEntryPointInfo));
+            ThrowIfNull(request.ApiEntryPointInfo.ApiPath, nameof(request.ApiEntryPointInfo.ApiPath));
+            ThrowIfNull(request.ApiEntryPointInfo.HttpMethod, nameof(request.ApiEntryPointInfo.HttpMethod));
+
+            var requestMessage = request.ApiEntryPointInfo.ContentType switch
+            {
+                "application/json" => GetJsonHttpRequestMessage(request, requestId, cancellationToken),
+                "multipart/form-data" => GetFormDataHttpRequestMessage(request, requestId, cancellationToken),
+                null => GetNonContentHttpRequestMessage(request, requestId, cancellationToken),
+                _ => throw new ArgumentOutOfRangeException()
+            };
+
+
+            if (request is IApiRequestQueryParams { HeaderParms: not null } pParams)
+            {
+                foreach (var key in pParams.HeaderParms.AllKeys)
+                {
+                    requestMessage.Headers.TryAddWithoutValidation(key, pParams.HeaderParms[key]);
+                }
+            }
+
+            return requestMessage;
+        }
+
+        private HttpRequestMessage GetNonContentHttpRequestMessage(IApiRequest request, Guid requestId,
+            CancellationToken cancellationToken)
+        {
+            var uri = GenerateUri(request);
+
+            var httpRequestMessage = new HttpRequestMessage()
+            {
+                RequestUri = uri,
+                Method = request.ApiEntryPointInfo.HttpMethod
+            };
+
+            PrintAtDebugMode($"[{requestId}] [header] \n {httpRequestMessage}");
+
+            return httpRequestMessage;
+        }
+
+        private HttpRequestMessage GetFormDataHttpRequestMessage(IApiRequest request, Guid requestId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
+        }
+
+        private HttpRequestMessage GetJsonHttpRequestMessage(IApiRequest request, Guid requestId,
+            CancellationToken cancellationToken)
+        {
+            var json = JsonConvert.SerializeObject(request,
+                new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+
+            var uri = GenerateUri(request);
+
+            var stringContent = new StringContent(json, default, request.ApiEntryPointInfo.ContentType);
+
+            var httpRequestMessage = new HttpRequestMessage()
+            {
+                RequestUri = uri,
+                Content = stringContent,
+                Method = request.ApiEntryPointInfo.HttpMethod
+            };
+
+            PrintAtDebugMode($"[{requestId}] [header] \n {httpRequestMessage}");
+            PrintAtDebugMode($"[{requestId}] [Post Body] \n {json}");
+
+            return httpRequestMessage;
+        }
+
+        private Uri GenerateUri(IApiRequest request)
+        {
+            var uriBuilder = new UriBuilder(_app.GatewayUrl)
+            {
+                Path = request.ApiEntryPointInfo.ApiPath
+            };
+
+            if (request is not IApiRequestQueryParams pParams)
+            {
+                return uriBuilder.Uri;
+            }
+
+            if (pParams.PathParms is not null)
+            {
+                foreach (var key in pParams.PathParms.AllKeys)
+                {
+                    uriBuilder.Path = uriBuilder.Path.Replace($"{{{key}}}", pParams.PathParms[key]);
+                }
+            }
+
+            if (pParams.QueryParms is not null)
+            {
+                uriBuilder.Query = pParams.QueryParms.ToString();
+            }
+
+            return uriBuilder.Uri;
+        }
+
+
+        private void ThrowIfNull(object? argument, string argumentName)
+        {
+            if (argument is null)
+            {
+                throw new ArgumentNullException(argumentName);
+            }
+        }
+
+        [Conditional("DEBUG")]
+        private void PrintAtDebugMode(string str)
+        {
+            if (str.Length < 1024)
+            {
+                Console.WriteLine(str);
+                return;
+            }
+
+            Console.WriteLine($"{str[..1024].ToString()}......Is too long");
+        }
+
+        public void Dispose()
+        {
+            _httpClient.Dispose();
+        }
+    }
+}

@@ -1,0 +1,24 @@
+#nullable disable
+using System;
+using System.Net.Http;
+
+namespace {{namespac}}.Request
+{
+    public class ApiEntryPointInfo
+    {
+        public readonly HttpMethod HttpMethod;
+        public readonly string ApiPath;
+        public readonly string ContentType;
+
+        [Obsolete("this method only for framework", true)]
+        public ApiEntryPointInfo() { }
+
+        public ApiEntryPointInfo(HttpMethod httpMethod, string apiPath, string contentType)
+        {
+            HttpMethod = httpMethod;
+            ApiPath = apiPath;
+            ContentType = contentType;
+        }
+
+    }
+}

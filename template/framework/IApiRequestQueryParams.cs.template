@@ -1,0 +1,16 @@
+
+using System.Collections.Specialized;
+using System.Text.Json.Serialization;
+
+namespace {{namespac}}.Request
+{
+    public interface IApiRequestQueryParams
+    {
+        [JsonIgnore]
+        public NameValueCollection? QueryParms { get; }
+        [JsonIgnore]
+        public NameValueCollection? HeaderParms { get; }
+        [JsonIgnore]
+        public NameValueCollection? PathParms { get; }
+    }
+}
