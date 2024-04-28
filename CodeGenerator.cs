@@ -246,11 +246,11 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
 
             if (parameter.In == InEnum.Path)
             {
-                pathParms.Add($"{type} {parameter.Name.Replace(".", "_")}", $"Parameters.{CultureInfo.CurrentCulture.TextInfo.ToTitleCase(parameter.Name.Replace(".", "_"))} = {parameter.Name.Replace(".", "_")}");
+                pathParms.Add($"{type} {parameter.Name.Replace(".", "_").Replace("-", "_")}", $"Parameters.{CultureInfo.CurrentCulture.TextInfo.ToTitleCase(parameter.Name.Replace(".", "_").Replace("-", "_"))} = {parameter.Name.Replace(".", "_").Replace("-", "_")}");
             }
 
             _sb.AppendLine($"/// <summary>{parameter.Description}</summary>");
-            _sb.AppendLine($"public {type} {CultureInfo.CurrentCulture.TextInfo.ToTitleCase(parameter.Name.Replace(".", "_"))} {{ get {getParm} set => {location}[\"{parameter.Name}\"] = value.ToString(); }}");
+            _sb.AppendLine($"public {type} {CultureInfo.CurrentCulture.TextInfo.ToTitleCase(parameter.Name.Replace(".", "_").Replace("-", "_"))} {{ get {getParm} set => {location}[\"{parameter.Name}\"] = value.ToString(); }}");
         }
         _sb.AppendLine("}");
 
