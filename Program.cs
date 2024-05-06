@@ -34,7 +34,12 @@ public class Run
     }
 
 
-    public void RequestOnly([Argument] string fileName, [Argument] string outPath, [Option] string namespac = "Swagger", [Option] string partialName = "")
+    public void RequestOnly(
+        [Argument] string fileName, 
+        [Argument] string outPath, 
+        [Option] string namespac = "Swagger", 
+        [Option] string partialName = "", 
+        [Option(Description = "Ignore the params in generater (Does not include Path params), exp: --ignore-params param1,param2,param3")] string ignoreParams = "")
     {
         string json = ReadJsonString(fileName);
 
@@ -47,7 +52,7 @@ public class Run
 
         foreach (var path in jsonObj.Paths)
         {
-            var generator = new CodeGenerator(jsonObj.Components.Schemas, namespac);
+            var generator = new CodeGenerator(jsonObj.Components.Schemas, namespac,ignoreParams);
 
             var tpartialName = partialName;
 

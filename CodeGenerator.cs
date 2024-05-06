@@ -12,12 +12,16 @@ public class CodeGenerator
     private readonly Dictionary<string, SchemaModule> _gloablSchemas;
     private readonly string _namespac;
 
-    public CodeGenerator(Dictionary<string, SchemaModule> schemas, string namespac)
+    private readonly string[] _ignoreParams;
+
+    public CodeGenerator(Dictionary<string, SchemaModule> schemas, string namespac, string ignoreParams)
     {
         _sb = new StringBuilder();
         _generatedClasses = new HashSet<string>();
         _gloablSchemas = schemas;
         this._namespac = namespac;
+
+        _ignoreParams = ignoreParams?.Split(',').ToArray() ?? Array.Empty<string>();
     }
 
 
@@ -220,6 +224,11 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
 
         foreach (var parameter in parameters)
         {
+            if (parameter.In != InEnum.Path && _ignoreParams.Contains(parameter.Name))
+            {
+                continue;
+            }
+
             var location = parameter.In switch
             {
                 InEnum.Header => "_params.HeaderParms",
