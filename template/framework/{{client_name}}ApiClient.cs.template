@@ -94,12 +94,12 @@ namespace {{namespac}}
             ThrowIfNull(request.ApiEntryPointInfo, nameof(request.ApiEntryPointInfo));
             ThrowIfNull(request.ApiEntryPointInfo.ApiPath, nameof(request.ApiEntryPointInfo.ApiPath));
             ThrowIfNull(request.ApiEntryPointInfo.HttpMethod, nameof(request.ApiEntryPointInfo.HttpMethod));
+            ThrowIfNull(request.ApiEntryPointInfo.ContentType, nameof(request.ApiEntryPointInfo.HttpMethod));
 
             var requestMessage = request.ApiEntryPointInfo.ContentType switch
             {
                 "application/json" => GetJsonHttpRequestMessage(request, requestId, cancellationToken),
                 "multipart/form-data" => GetFormDataHttpRequestMessage(request, requestId, cancellationToken),
-                null => GetNonContentHttpRequestMessage(request, requestId, cancellationToken),
                 _ => throw new ArgumentOutOfRangeException()
             };
 
@@ -113,22 +113,6 @@ namespace {{namespac}}
             }
 
             return requestMessage;
-        }
-
-        private HttpRequestMessage GetNonContentHttpRequestMessage(IApiRequest request, Guid requestId,
-            CancellationToken cancellationToken)
-        {
-            var uri = GenerateUri(request);
-
-            var httpRequestMessage = new HttpRequestMessage()
-            {
-                RequestUri = uri,
-                Method = request.ApiEntryPointInfo.HttpMethod
-            };
-
-            PrintAtDebugMode($"[{requestId}] [header] \n {httpRequestMessage}");
-
-            return httpRequestMessage;
         }
 
         private HttpRequestMessage GetFormDataHttpRequestMessage(IApiRequest request, Guid requestId,
