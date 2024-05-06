@@ -35,10 +35,10 @@ public class Run
 
 
     public void RequestOnly(
-        [Argument] string fileName, 
-        [Argument] string outPath, 
-        [Option] string namespac = "Swagger", 
-        [Option] string partialName = "", 
+        [Argument] string fileName,
+        [Argument] string outPath,
+        [Option] string namespac = "Swagger",
+        [Option] string partialName = "",
         [Option(Description = "Ignore the params in generater (Does not include Path params), exp: --ignore-params param1,param2,param3")] string ignoreParams = "")
     {
         string json = ReadJsonString(fileName);
@@ -52,34 +52,41 @@ public class Run
 
         foreach (var path in jsonObj.Paths)
         {
-            var generator = new CodeGenerator(jsonObj.Components.Schemas, namespac,ignoreParams);
-
-            var tpartialName = partialName;
-
-            var code = generator.GenerateCode(path.Value, path.Key, out var apiName, ref tpartialName);
-
-            var sr = new StringReader(code);
-            var sb = new StringBuilder();
-
-            var spanCount = 0;
-            string? s = null;
-
-            while ((s = sr.ReadLine()) is not null)
+            try
             {
-                if (s.StartsWith("}"))
+                var generator = new CodeGenerator(jsonObj.Components.Schemas, namespac, ignoreParams);
+
+                var tpartialName = partialName;
+
+                var code = generator.GenerateCode(path.Value, path.Key, out var apiName, ref tpartialName);
+
+                var sr = new StringReader(code);
+                var sb = new StringBuilder();
+
+                var spanCount = 0;
+                string? s = null;
+
+                while ((s = sr.ReadLine()) is not null)
                 {
-                    spanCount--;
+                    if (s.StartsWith("}"))
+                    {
+                        spanCount--;
+                    }
+
+                    sb.AppendLine(new string('\t', spanCount) + s);
+
+                    if (s.StartsWith("{"))
+                    {
+                        spanCount++;
+                    }
                 }
 
-                sb.AppendLine(new string('\t', spanCount) + s);
-
-                if (s.StartsWith("{"))
-                {
-                    spanCount++;
-                }
+                File.WriteAllText(Path.Combine(outPath, $"{tpartialName}.{apiName}.cs"), sb.ToString());
             }
-
-            File.WriteAllText(Path.Combine(outPath, $"{tpartialName}.{apiName}.cs"), sb.ToString());
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
         }
 
     }
