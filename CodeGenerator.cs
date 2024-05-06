@@ -113,10 +113,13 @@ public class CodeGenerator
         var hasParameters = get.Parameters?.Length is not null and not 0;
         var parmetersAppend = string.Empty;
 
-        if (hasParameters)
+        if (hasParameters
+         && !(get.Parameters!.All(x => _ignoreParams.Contains(x.Name))
+         && get.Parameters!.All(x => x.In != InEnum.Path)))
         {
             parmetersAppend = ", IApiRequestQueryParams";
         }
+
 
         _sb.AppendLine($"public class {constName}Request : IApiRequest{parmetersAppend}");
         _sb.AppendLine("{");
@@ -155,8 +158,9 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
         var hasParameters = parameters?.Length is not null and not 0;
         var parmetersAppend = string.Empty;
 
-        if (hasParameters 
-         && !(parameters!.All(x => _ignoreParams.Contains(x.Name)) && parameters!.All(x => x.In != InEnum.Path)))
+        if (hasParameters
+         && !(parameters!.All(x => _ignoreParams.Contains(x.Name))
+         && parameters!.All(x => x.In != InEnum.Path)))
         {
             parmetersAppend = ", IApiRequestQueryParams";
         }
