@@ -155,11 +155,12 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
         var hasParameters = parameters?.Length is not null and not 0;
         var parmetersAppend = string.Empty;
 
-        if (hasParameters)
+        if (hasParameters 
+         && parameters!.All(x => _ignoreParams.Contains(x.Name))
+         && parameters!.All(x => x.In != InEnum.Path))
         {
             parmetersAppend = ", IApiRequestQueryParams";
         }
-
 
 
         if (schema.Type == TypeEnum.Array)
