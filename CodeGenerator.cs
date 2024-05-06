@@ -79,25 +79,25 @@ public class CodeGenerator
 
         if (value.Post?.Schema is not null)
         {
-            _sb.AppendLine($"/// <summary>{value.Post.Summary}</summary>");
+            _sb.AppendLine($"/// <summary>{value.Post.Summary?.Trim().Replace("\n", "\n///")}</summary>");
             GenerateByPostSchema(value.Post.Schema, apiName + "Post", constName, apiPath, value.Post.Parameters, contentType, "POST");
         }
 
         if (value.Patch?.Schema is not null)
         {
-            _sb.AppendLine($"/// <summary>{value.Patch.Summary}</summary>");
+            _sb.AppendLine($"/// <summary>{value.Patch.Summary?.Trim().Replace("\n", "\n///")}</summary>");
             GenerateByPostSchema(value.Patch.Schema, apiName + "Patch", constName, apiPath, value.Patch.Parameters, contentType, "PATCH");
         }
 
         if (value.Get is not null)
         {
-            _sb.AppendLine($"/// <summary>{value.Get.Summary}</summary>");
+            _sb.AppendLine($"/// <summary>{value.Get.Summary?.Trim().Replace("\n", "\n///")}</summary>");
             GenerateByGetSchema(value.Get, apiName + "Get", constName, apiPath, "GET");
         }
 
         if (value.Delete is not null)
         {
-            _sb.AppendLine($"/// <summary>{value.Delete.Summary}</summary>");
+            _sb.AppendLine($"/// <summary>{value.Delete.Summary?.Trim().Replace("\n", "\n///")}</summary>");
             GenerateByGetSchema(value.Delete, apiName + "Delete", constName, apiPath, "DELETE");
         }
 
@@ -264,7 +264,7 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
                 pathParms.Add($"{type} {parameter.Name.Replace(".", "_").Replace("-", "_")}", $"Parameters.{CultureInfo.CurrentCulture.TextInfo.ToTitleCase(parameter.Name.Replace(".", "_").Replace("-", "_"))} = {parameter.Name.Replace(".", "_").Replace("-", "_")}");
             }
 
-            _sb.AppendLine($"/// <summary>{parameter.Description}</summary>");
+            _sb.AppendLine($"/// <summary>{parameter.Description?.Trim().Replace("\n", "\n///")}</summary>");
             _sb.AppendLine($"public {type} {CultureInfo.CurrentCulture.TextInfo.ToTitleCase(parameter.Name.Replace(".", "_").Replace("-", "_"))} {{ get {getParm} set => {location}[\"{parameter.Name}\"] = value.ToString(); }}");
         }
         _sb.AppendLine("}");
@@ -375,7 +375,7 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
     {
         Console.WriteLine(@$"[JsonProperty(""{name}"")]");
 
-        _sb.AppendLine($"/// <summary>{schema.Description?.Replace("\n", "\n///")}</summary>");
+        _sb.AppendLine($"/// <summary>{schema.Description?.Trim().Replace("\n", "\n///")}</summary>");
         _sb.AppendLine(@$"[JsonProperty(""{name}"")]");
 
 
