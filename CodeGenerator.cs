@@ -197,6 +197,12 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
 
     private void GenerateQueryParms(ParameterModule[] parameters, string name)
     {
+        if (parameters.All(x => _ignoreParams.Contains(x.Name))
+         && parameters.All(x => x.In != InEnum.Path))
+        {
+            return;
+        }
+
         var containsQuery = parameters.Any(x => x.In == InEnum.Query);
         var containsHeader = parameters.Any(x => x.In == InEnum.Header);
         var containsPath = parameters.Any(x => x.In == InEnum.Path);
