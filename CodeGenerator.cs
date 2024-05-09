@@ -359,7 +359,6 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
 
 
         Console.WriteLine($"public class {className}");
-        _sb.AppendLine($"[Obsolete]");
         _sb.AppendLine($"public class {className}");
         _sb.AppendLine($"{{");
 
