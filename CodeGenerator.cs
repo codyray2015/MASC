@@ -260,7 +260,7 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
             var type = parameter.Schema.Type switch
             {
                 TypeEnum.String => "string",
-                _ => $"{ParseType(parameter.Schema.Type)}?"
+                _ => $"{ParseType(parameter.Schema.Type, parameter.Schema.Format)}?"
             };
 
             if (parameter.In == InEnum.Path)
@@ -399,7 +399,7 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
             case TypeEnum.Integer:
             case TypeEnum.Boolean:
             case TypeEnum.Number:
-                _sb.AppendLine($"public {ParseType(schema.Type)} {name} {{ get; set; }}");
+                _sb.AppendLine($"public {ParseType(schema.Type, schema.Format)} {name} {{ get; set; }}");
                 break;
             case TypeEnum.Object:
                 _sb.AppendLine($"public {name}Object {name} {{ get; set; }}");
@@ -420,22 +420,38 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
                 }
                 else
                 {
-                    _sb.AppendLine($"public List<{ParseType(schema.Items.Type)}> {name} {{ get; set; }}");
+                    _sb.AppendLine($"public List<{ParseType(schema.Items.Type, schema.Items.Format)}> {name} {{ get; set; }}");
                 }
                 break;
         }
 
     }
 
-    public string ParseType(TypeEnum typeEnum) => typeEnum switch
+    public string ParseType(TypeEnum typeEnum, string format)
     {
-        TypeEnum.Array => "object",
-        TypeEnum.Object => "object",
-        TypeEnum.Integer => "int",
-        TypeEnum.Boolean => "bool",
-        TypeEnum.Number => "float",
-        TypeEnum.String => "string",
-        _ => throw new NotImplementedException()
-    };
+        switch (typeEnum)
+        {
+            case TypeEnum.Array:
+                return "object";
+            case TypeEnum.Object:
+                return "object";
+            case TypeEnum.Boolean:
+                return "bool";
+            case TypeEnum.Number:
+                return "float";
+            case TypeEnum.String:
+                return "string";
+            case TypeEnum.Integer:
+                return format switch
+                {
+                    "int32" => "int",
+                    "int64" => "long",
+                    _ => throw new NotImplementedException()
+                };
+            default:
+                throw new NotImplementedException();
+        }
+    }
+
 
 }
