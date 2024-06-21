@@ -274,6 +274,7 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
         _sb.AppendLine("}");
 
 
+        _sb.AppendLine($"[JsonIgnore]");
         _sb.AppendLine($"public readonly {name}QueryParms Parameters;");
 
         _sb.AppendLine("[Obsolete(\"this field only for framework\")]");
