@@ -128,7 +128,6 @@ public class CodeGenerator
 private static readonly ApiEntryPointInfo {apiName}_{constName}Request
     = new ApiEntryPointInfo(new HttpMethod(""{method}""), ""{apiPath}"",default);
 
-[JsonIgnore]
 public ApiEntryPointInfo ApiEntryPointInfo {{ get => _apiEntryPointInfo; set => _apiEntryPointInfo = value; }}
 private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
             ";
@@ -182,7 +181,6 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
 private static readonly ApiEntryPointInfo {apiName}_{constName}Request
     = new ApiEntryPointInfo(new HttpMethod(""{method}""), ""{apiPath}"", ""{contentType}"");
 
-[JsonIgnore]
 public ApiEntryPointInfo ApiEntryPointInfo {{ get => _apiEntryPointInfo; set => _apiEntryPointInfo = value; }}
 private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
             ";
@@ -276,16 +274,12 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
         _sb.AppendLine("}");
 
 
-        _sb.AppendLine($"[JsonIgnore]");
         _sb.AppendLine($"public readonly {name}QueryParms Parameters;");
 
-        _sb.AppendLine("[JsonIgnore]");
         _sb.AppendLine("[Obsolete(\"this field only for framework\")]");
         _sb.AppendLine("public NameValueCollection QueryParms => _query;");
-        _sb.AppendLine("[JsonIgnore]");
         _sb.AppendLine("[Obsolete(\"this field only for framework\")]");
         _sb.AppendLine("public NameValueCollection HeaderParms => _header;");
-        _sb.AppendLine("[JsonIgnore]");
         _sb.AppendLine("[Obsolete(\"this field only for framework\")]");
         _sb.AppendLine("public NameValueCollection PathParms => _path;");
 
