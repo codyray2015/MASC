@@ -11,6 +11,7 @@ public class SwaggerModule
 public class PathsModule
 {
     public RequestModule Post { get; set; }
+    public RequestModule Put { get; set; }
     public RequestModule Patch { get; set; }
     public RequestModule Get { get; set; }
     public RequestModule Delete { get; set; }
@@ -19,6 +20,7 @@ public class PathsModule
 public class SchemasModule
 {
     public Dictionary<string, SchemaModule> Schemas { get; set; }
+    public Dictionary<string, ParameterModule> Parameters { get; set; }
 }
 
 public class RequestModule
@@ -37,6 +39,7 @@ public class ParameterModule
     public InEnum In { get; set; }
     public SchemaModule Schema { get; set; }
     public string Description { get; set; }
+    public string Source { get; set; }
 }
 
 public class RequestBodyModule

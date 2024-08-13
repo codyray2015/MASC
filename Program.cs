@@ -54,7 +54,7 @@ public class Run
         {
             try
             {
-                var generator = new CodeGenerator(jsonObj.Components.Schemas, namespac, ignoreParams);
+                var generator = new CodeGenerator(jsonObj.Components.Schemas, jsonObj.Components.Parameters, namespac, ignoreParams);
 
                 var tpartialName = partialName;
 

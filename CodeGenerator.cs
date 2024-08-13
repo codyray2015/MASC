@@ -10,15 +10,17 @@ public class CodeGenerator
     private StringBuilder _sb;
     private HashSet<string> _generatedClasses;
     private readonly Dictionary<string, SchemaModule> _gloablSchemas;
+    private readonly Dictionary<string, ParameterModule> _gloablParameters;
     private readonly string _namespac;
 
     private readonly string[] _ignoreParams;
 
-    public CodeGenerator(Dictionary<string, SchemaModule> schemas, string namespac, string ignoreParams)
+    public CodeGenerator(Dictionary<string, SchemaModule> schemas, Dictionary<string, ParameterModule> parameters, string namespac, string ignoreParams)
     {
         _sb = new StringBuilder();
         _generatedClasses = new HashSet<string>();
         _gloablSchemas = schemas;
+        _gloablParameters = parameters;
         this._namespac = namespac;
 
         _ignoreParams = ignoreParams?.Split(',').ToArray() ?? Array.Empty<string>();
@@ -81,6 +83,12 @@ public class CodeGenerator
         {
             _sb.AppendLine($"/// <summary>{value.Post.Summary?.Trim().Replace("\n", "\n///")}</summary>");
             GenerateByPostSchema(value.Post.Schema, apiName + "Post", constName, apiPath, value.Post.Parameters, contentType, "POST");
+        }
+
+        if (value.Put?.Schema is not null)
+        {
+            _sb.AppendLine($"/// <summary>{value.Put.Summary?.Trim().Replace("\n", "\n///")}</summary>");
+            GenerateByPostSchema(value.Put.Schema, apiName + "Put", constName, apiPath, value.Put.Parameters, contentType, "PUT");
         }
 
         if (value.Patch?.Schema is not null)
@@ -232,8 +240,15 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
 
         var pathParms = new NameValueCollection();
 
-        foreach (var parameter in parameters)
+        foreach (var tParameter in parameters)
         {
+            var parameter = tParameter;
+
+            if (parameter.Source is not null)
+            {
+                parameter = _gloablParameters[parameter.Source.Split('/').Last()];
+            }
+
             if (parameter.In != InEnum.Path && _ignoreParams.Contains(parameter.Name))
             {
                 continue;
@@ -447,7 +462,7 @@ private ApiEntryPointInfo _apiEntryPointInfo = {apiName}_{constName}Request;
                 {
                     "int32" => "int",
                     "int64" => "long",
-                    _ => throw new NotImplementedException()
+                    _ => "long"
                 };
             default:
                 throw new NotImplementedException();
