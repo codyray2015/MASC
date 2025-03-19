@@ -1,9 +1,12 @@
 ﻿using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 using Cocona;
 using YamlDotNet.Serialization;
 
 CoconaLiteApp.Run<Run>(args);
+
+// new Run().RequestOnly("example/case1/swagger.yaml", "test");
 
 public class Run
 {
@@ -110,13 +113,103 @@ public class Run
 
     private static string ReadByYaml(string fileName)
     {
+        var yamlContent = ReadYamlContent(fileName);
+
+
         var deserializer = new DeserializerBuilder().Build();
-        var yamlObject = deserializer.Deserialize(File.ReadAllText(fileName));
+        var yamlObject = deserializer.Deserialize(yamlContent);
 
         var serializer = new SerializerBuilder()
             .JsonCompatible()
             .Build();
 
         return serializer.Serialize(yamlObject);
+    }
+
+
+    private static Dictionary<string, string> YamlContentCache = new Dictionary<string, string>();
+
+
+    private static string ReadYamlContent(string fileName)
+    {
+        var tempFileName = Path.GetFileName(fileName);
+        if (YamlContentCache.TryGetValue(tempFileName, out var value))
+        {
+            return value;
+        }
+
+
+
+
+        Console.WriteLine($"Read {fileName}");
+        var sb = new StringBuilder();
+        var content = File.ReadAllText(fileName);
+        content = Regex.Replace(content, "\\$ref: >-\n", "$ref:");
+
+        foreach (var item in content.Split("\n"))
+        {
+            if (item.TrimStart().StartsWith("$ref:") && item.TrimEnd().EndsWith("yaml"))
+            {
+                var prefix = item.Substring(0, item.IndexOf("$ref:"));
+
+
+                var newfilePath = Path.Combine(Path.GetDirectoryName(fileName), item.TrimStart().Replace("$ref:", "").Trim());
+
+                if (Path.GetFileName(newfilePath) == tempFileName)
+                {
+                    continue;
+                }
+
+                var stringReader = new StringReader(ReadYamlContent(newfilePath));
+
+                string? tempLine;
+
+                while ((tempLine = stringReader.ReadLine()) is not null)
+                {
+                    sb.AppendLine(prefix + tempLine);
+                }
+
+            }
+            else if (item.TrimStart().StartsWith("- $ref:") && item.TrimEnd().EndsWith("yaml"))
+            {
+                var prefix = item.Substring(0, item.IndexOf("- $ref:"));
+
+
+                var newfilePath = Path.Combine(Path.GetDirectoryName(fileName), item.TrimStart().Replace("- $ref:", "").Trim());
+
+                if (Path.GetFileName(newfilePath) == tempFileName)
+                {
+                    continue;
+                }
+
+                var stringReader = new StringReader(ReadYamlContent(newfilePath));
+
+                string? tempLine;
+                bool isFirst = true;
+
+
+                while ((tempLine = stringReader.ReadLine()) is not null)
+                {
+                    if (isFirst)
+                    {
+                        sb.AppendLine(prefix + "- " + tempLine);
+                        isFirst = false;
+                    }
+                    else
+                    {
+                        sb.AppendLine(prefix + "  " + tempLine);
+                    }
+
+                }
+            }
+            else
+            {
+                sb.AppendLine(item);
+            }
+        }
+
+        YamlContentCache.TryAdd(tempFileName, sb.ToString());
+
+        return sb.ToString();
     }
 }
