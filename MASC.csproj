@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -10,7 +10,8 @@
 
   <ItemGroup>
     <PackageReference Include="Cocona.Lite" Version="2.2.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Microsoft.OpenApi" Version="1.6.29" />
+    <PackageReference Include="Microsoft.OpenApi.Readers" Version="1.6.29" />
     <PackageReference Include="YamlDotNet" Version="15.1.2" />
   </ItemGroup>
 

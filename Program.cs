@@ -1,215 +1,71 @@
-﻿using System.Diagnostics;
-using System.Text;
-using System.Text.RegularExpressions;
 using Cocona;
-using YamlDotNet.Serialization;
+using MASC.Generation;
+using MASC.Loading;
 
-CoconaLiteApp.Run<Run>(args);
+CoconaLiteApp.Run<Commands>(args);
 
-// new Run().RequestOnly("example/case1/swagger.yaml", "test");
-
-public class Run
+/// <summary>CLI 命令定义(由 Cocona 绑定)。</summary>
+public class Commands
 {
-    public void FrameworkOnly([Argument] string outPath, [Option] string namespac = "Swagger", [Option] string clientName = "")
+    /// <summary>仅生成运行时框架代码(对 template/framework 下的模板做占位符替换)。</summary>
+    public void FrameworkOnly(
+        [Argument] string outPath,
+        [Option] string namespac = "Swagger",
+        [Option] string clientName = "")
     {
-        var fileNames = Directory.GetFiles("template/framework");
+        Directory.CreateDirectory(outPath);
 
-        if (!Directory.Exists(outPath))
+        foreach (var templatePath in Directory.GetFiles("template/framework"))
         {
-            Directory.CreateDirectory(outPath);
-        }
-
-        foreach (var fileName in fileNames)
-        {
-            var fileInfo = new FileInfo(fileName);
-
-            var fileContent = File.ReadAllText(fileName);
-
-            var outContent = fileContent.Replace("{{namespac}}", namespac)
-                .Replace("{{client_name}}", clientName);
-
-            var outP = Path.Combine(outPath, fileInfo.Name.Replace(".template", ""))
+            var content = File.ReadAllText(templatePath)
                 .Replace("{{namespac}}", namespac)
                 .Replace("{{client_name}}", clientName);
 
-            File.WriteAllText(outP, outContent);
+            var outName = Path.GetFileName(templatePath)
+                .Replace(".template", string.Empty)
+                .Replace("{{namespac}}", namespac)
+                .Replace("{{client_name}}", clientName);
+
+            File.WriteAllText(Path.Combine(outPath, outName), content);
         }
     }
 
-
+    /// <summary>根据 Swagger/OpenAPI 文档(JSON 或 YAML)生成各路径的请求类。</summary>
     public void RequestOnly(
         [Argument] string fileName,
         [Argument] string outPath,
         [Option] string namespac = "Swagger",
         [Option] string partialName = "",
-        [Option(Description = "Ignore the params in generater (Does not include Path params), exp: --ignore-params param1,param2,param3")] string ignoreParams = "")
+        [Option(Description = "Ignore the params in generater (Does not include Path params), exp: --ignore-params param1,param2,param3")]
+        string ignoreParams = "")
     {
-        string json = ReadJsonString(fileName);
+        var document = OpenApiLoader.Load(fileName);
+        Directory.CreateDirectory(outPath);
 
-        var jsonObj = Newtonsoft.Json.JsonConvert.DeserializeObject<SwaggerModule>(json);
+        // 整轮共享一个模型注册表：被 $ref 引用的模型统一收集，最后生成到 Models 文件。
+        // 指定 partial-name 时(同一项目多次生成的典型用法)，模型放入按其区分的子命名空间，
+        // 避免不同来源的同名模型在同一命名空间下冲突。
+        var modelsNamespace = string.IsNullOrEmpty(partialName)
+            ? $"{namespac}.Models"
+            : $"{namespac}.Models.{Naming.SafeIdentifier(partialName)}";
 
-        if (!Directory.Exists(outPath))
-        {
-            Directory.CreateDirectory(outPath);
-        }
+        var models = new ModelRegistry();
 
-        foreach (var path in jsonObj.Paths)
+        foreach (var (apiPath, pathItem) in document.Paths)
         {
             try
             {
-                var generator = new CodeGenerator(jsonObj.Components.Schemas, jsonObj.Components.Parameters, namespac, ignoreParams);
-
-                var tpartialName = partialName;
-
-                var code = generator.GenerateCode(path.Value, path.Key, out var apiName, ref tpartialName);
-
-                var sr = new StringReader(code);
-                var sb = new StringBuilder();
-
-                var spanCount = 0;
-                string? s = null;
-
-                while ((s = sr.ReadLine()) is not null)
-                {
-                    if (s.StartsWith("}"))
-                    {
-                        spanCount--;
-                    }
-
-                    sb.AppendLine(new string('\t', spanCount) + s);
-
-                    if (s.StartsWith("{"))
-                    {
-                        spanCount++;
-                    }
-                }
-
-                File.WriteAllText(Path.Combine(outPath, $"{tpartialName}.{apiName}.cs"), sb.ToString());
+                var generator = new RequestGenerator(namespac, modelsNamespace, ignoreParams, models);
+                var file = generator.Generate(pathItem, apiPath, partialName);
+                var outFile = Path.Combine(outPath, $"{file.PartialClassName}.{file.ApiName}.cs");
+                File.WriteAllText(outFile, file.Code);
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.ToString());
+                Console.WriteLine($"[ERROR] {apiPath}: {ex}");
             }
         }
 
-    }
-
-    static string ReadJsonString(string fileName)
-    {
-        string json = string.Empty;
-
-        if (fileName.EndsWith("yaml"))
-        {
-            json = ReadByYaml(fileName);
-        }
-        else if (fileName.EndsWith("json"))
-        {
-            json = File.ReadAllText(fileName);
-        }
-
-        json = json.Replace("\"$ref\"", "\"source\"");
-        return json;
-    }
-
-    private static string ReadByYaml(string fileName)
-    {
-        var yamlContent = ReadYamlContent(fileName);
-
-
-        var deserializer = new DeserializerBuilder().Build();
-        var yamlObject = deserializer.Deserialize(yamlContent);
-
-        var serializer = new SerializerBuilder()
-            .JsonCompatible()
-            .Build();
-
-        return serializer.Serialize(yamlObject);
-    }
-
-
-    private static Dictionary<string, string> YamlContentCache = new Dictionary<string, string>();
-
-
-    private static string ReadYamlContent(string fileName)
-    {
-        var tempFileName = Path.GetFileName(fileName);
-        if (YamlContentCache.TryGetValue(tempFileName, out var value))
-        {
-            return value;
-        }
-
-
-
-
-        Console.WriteLine($"Read {fileName}");
-        var sb = new StringBuilder();
-        var content = File.ReadAllText(fileName);
-        content = Regex.Replace(content, "\\$ref: >-\n", "$ref:");
-
-        foreach (var item in content.Split("\n"))
-        {
-            if (item.TrimStart().StartsWith("$ref:") && item.TrimEnd().EndsWith("yaml"))
-            {
-                var prefix = item.Substring(0, item.IndexOf("$ref:"));
-
-
-                var newfilePath = Path.Combine(Path.GetDirectoryName(fileName), item.TrimStart().Replace("$ref:", "").Trim());
-
-                if (Path.GetFileName(newfilePath) == tempFileName)
-                {
-                    continue;
-                }
-
-                var stringReader = new StringReader(ReadYamlContent(newfilePath));
-
-                string? tempLine;
-
-                while ((tempLine = stringReader.ReadLine()) is not null)
-                {
-                    sb.AppendLine(prefix + tempLine);
-                }
-
-            }
-            else if (item.TrimStart().StartsWith("- $ref:") && item.TrimEnd().EndsWith("yaml"))
-            {
-                var prefix = item.Substring(0, item.IndexOf("- $ref:"));
-
-
-                var newfilePath = Path.Combine(Path.GetDirectoryName(fileName), item.TrimStart().Replace("- $ref:", "").Trim());
-
-                if (Path.GetFileName(newfilePath) == tempFileName)
-                {
-                    continue;
-                }
-
-                var stringReader = new StringReader(ReadYamlContent(newfilePath));
-
-                string? tempLine;
-                bool isFirst = true;
-
-
-                while ((tempLine = stringReader.ReadLine()) is not null)
-                {
-                    if (isFirst)
-                    {
-                        sb.AppendLine(prefix + "- " + tempLine);
-                        isFirst = false;
-                    }
-                    else
-                    {
-                        sb.AppendLine(prefix + "  " + tempLine);
-                    }
-
-                }
-            }
-            else
-            {
-                sb.AppendLine(item);
-            }
-        }
-
-        YamlContentCache.TryAdd(tempFileName, sb.ToString());
-
-        return sb.ToString();
+        File.WriteAllText(Path.Combine(outPath, "Models.cs"), models.EmitFile(modelsNamespace));
     }
 }

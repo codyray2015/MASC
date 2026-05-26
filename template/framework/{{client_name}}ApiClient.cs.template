@@ -94,15 +94,15 @@ namespace {{namespac}}
             ThrowIfNull(request.ApiEntryPointInfo, nameof(request.ApiEntryPointInfo));
             ThrowIfNull(request.ApiEntryPointInfo.ApiPath, nameof(request.ApiEntryPointInfo.ApiPath));
             ThrowIfNull(request.ApiEntryPointInfo.HttpMethod, nameof(request.ApiEntryPointInfo.HttpMethod));
-            ThrowIfNull(request.ApiEntryPointInfo.ContentType, nameof(request.ApiEntryPointInfo.HttpMethod));
 
-            var requestMessage = request.ApiEntryPointInfo.ContentType switch
+            // 先构造 URI(含 path / query 参数)，再按 ContentType 决定请求体。
+            // ContentType 为空时表示无请求体(GET / DELETE / 仅含参数的请求)。
+            var requestMessage = new HttpRequestMessage
             {
-                "application/json" => GetJsonHttpRequestMessage(request, requestId, cancellationToken),
-                "multipart/form-data" => GetFormDataHttpRequestMessage(request, requestId, cancellationToken),
-                _ => throw new ArgumentOutOfRangeException()
+                RequestUri = GenerateUri(request),
+                Method = request.ApiEntryPointInfo.HttpMethod,
+                Content = BuildContent(request, requestId)
             };
-
 
             if (request is IApiRequestQueryParams { HeaderParms: not null } pParams)
             {
@@ -112,56 +112,57 @@ namespace {{namespac}}
                 }
             }
 
+            PrintAtDebugMode($"[{requestId}] [header] \n {requestMessage}");
+
             return requestMessage;
         }
 
-        private HttpRequestMessage GetFormDataHttpRequestMessage(IApiRequest request, Guid requestId,
-            CancellationToken cancellationToken)
+        private HttpContent BuildContent(IApiRequest request, Guid requestId)
+        {
+            switch (request.ApiEntryPointInfo.ContentType)
+            {
+                case "application/json":
+                    var json = JsonConvert.SerializeObject(request,
+                        new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+                    PrintAtDebugMode($"[{requestId}] [Body] \n {json}");
+                    return new StringContent(json, default, "application/json");
+
+                case "multipart/form-data":
+                    return GetFormDataContent(request);
+
+                default:
+                    // 无请求体。
+                    return null;
+            }
+        }
+
+        private HttpContent GetFormDataContent(IApiRequest request)
         {
             throw new NotImplementedException();
         }
 
-        private HttpRequestMessage GetJsonHttpRequestMessage(IApiRequest request, Guid requestId,
-            CancellationToken cancellationToken)
-        {
-            var json = JsonConvert.SerializeObject(request,
-                new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-
-            var uri = GenerateUri(request);
-
-            var stringContent = new StringContent(json, default, request.ApiEntryPointInfo.ContentType);
-
-            var httpRequestMessage = new HttpRequestMessage()
-            {
-                RequestUri = uri,
-                Content = stringContent,
-                Method = request.ApiEntryPointInfo.HttpMethod
-            };
-
-            PrintAtDebugMode($"[{requestId}] [header] \n {httpRequestMessage}");
-            PrintAtDebugMode($"[{requestId}] [Post Body] \n {json}");
-
-            return httpRequestMessage;
-        }
-
         private Uri GenerateUri(IApiRequest request)
         {
+            // 在原始路径串(含字面 "{key}")上替换 path 参数，再交给 UriBuilder 编码。
+            // 不能在 uriBuilder.Path 上替换：它会把 "{}" 编码成 "%7B%7D"，导致替换失配。
+            var path = request.ApiEntryPointInfo.ApiPath;
+
+            if (request is IApiRequestQueryParams { PathParms: not null } pathParams)
+            {
+                foreach (var key in pathParams.PathParms.AllKeys)
+                {
+                    path = path.Replace($"{{{key}}}", pathParams.PathParms[key]);
+                }
+            }
+
             var uriBuilder = new UriBuilder(_app.GatewayUrl)
             {
-                Path = request.ApiEntryPointInfo.ApiPath
+                Path = path
             };
 
             if (request is not IApiRequestQueryParams pParams)
             {
                 return uriBuilder.Uri;
-            }
-
-            if (pParams.PathParms is not null)
-            {
-                foreach (var key in pParams.PathParms.AllKeys)
-                {
-                    uriBuilder.Path = uriBuilder.Path.Replace($"{{{key}}}", pParams.PathParms[key]);
-                }
             }
 
             if (pParams.QueryParms is not null)
