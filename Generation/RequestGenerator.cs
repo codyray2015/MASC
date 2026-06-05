@@ -94,8 +94,13 @@ public class RequestGenerator
 
         var body = op.BodySchema();
 
-        // oneOf 请求体走独立分支(生成一组变体请求类)。
-        if (body?.OneOf is { Count: > 0 })
+        // oneOf 只在「真正的多态变体」时走独立分支:
+        //   1) body 自身无 properties(不是普通对象)
+        //   2) 至少一个变体带 $ref(指向独立组件 schema)
+        // 否则把 oneOf 当作校验约束(如「N 选一必填」)忽略，按 properties 走普通 body 类。
+        if (body?.OneOf is { Count: > 0 }
+            && (body.Properties is null || body.Properties.Count == 0)
+            && body.OneOf.Any(v => v.Reference is not null))
         {
             WriteOneOf(op, body, operationName, partial, apiPath, httpMethod);
             return;
@@ -232,6 +237,9 @@ public class RequestGenerator
 
         var ctorArgs = new List<string>();
         var ctorAssignments = new List<string>();
+        // 防止同一端点上 spec 给出多个 alias 参数(如 Yandex 同时声明 `region_id` 和 `regionId`
+        // 兼容旧版)归一后 C# 属性名相同导致 CS0102；保留先出现的那个。
+        var emittedProperties = new HashSet<string>();
 
         foreach (var p in parameters)
         {
@@ -251,6 +259,12 @@ public class RequestGenerator
             var kind = p.Schema?.Kind() ?? SchemaType.String;
             var (type, getter) = TypeMapper.ParameterAccessor(kind, p.Schema?.Format, collection, p.Name);
             var property = Naming.Identifier(p.Name);
+
+            if (!emittedProperties.Add(property))
+            {
+                _w.Line($"// 跳过重复参数(C# 名 '{property}' 已存在, 原始名 '{p.Name}')");
+                continue;
+            }
 
             if (location == ParameterLocation.Path)
             {
