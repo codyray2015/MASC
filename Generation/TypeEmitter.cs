@@ -52,8 +52,16 @@ public class TypeEmitter
         }
 
         // 引用($ref)优先于 type 判断：引用类型登记为共享模型，按模型名引用。
+        // 例外: $ref 指向基本类型(常见的"字符串枚举别名"，如 `languageLanguage`)，
+        // 不要注册成空 class —— 它没有 properties，会变成无用的 `public class X { }`。
+        // 直接按基本类型生成属性即可，枚举可选值已经在 schema.Description 里。
         if (schema.IsReference())
         {
+            if (IsPrimitiveAlias(schema))
+            {
+                EmitPrimitiveProperty(schema, property);
+                return;
+            }
             var model = _models.Register(schema);
             _w.Line($"public {model} {property} {{ get; set; }}");
             return;
@@ -87,6 +95,32 @@ public class TypeEmitter
         }
     }
 
+    /// <summary>$ref 指向的目标 schema 是不是基本标量类型(string/int/number/bool)。</summary>
+    private static bool IsPrimitiveAlias(OpenApiSchema schema)
+    {
+        var kind = schema.Kind();
+        return kind == SchemaType.String
+            || kind == SchemaType.Integer
+            || kind == SchemaType.Number
+            || kind == SchemaType.Boolean;
+    }
+
+    private void EmitPrimitiveProperty(OpenApiSchema schema, string property)
+    {
+        if (schema.Kind() == SchemaType.String && schema.Format == "binary")
+        {
+            _w.Line($"public Stream {property} {{ get; set; }}");
+        }
+        else if (schema.Kind() == SchemaType.String)
+        {
+            _w.Line($"public string {property} {{ get; set; }}");
+        }
+        else
+        {
+            _w.Line($"public {TypeMapper.Scalar(schema.Kind(), schema.Format)} {property} {{ get; set; }}");
+        }
+    }
+
     private void WriteArrayField(OpenApiSchema schema, string property)
     {
         var items = schema.Items;
@@ -98,8 +132,16 @@ public class TypeEmitter
 
         if (items.IsReference())
         {
-            var model = _models.Register(items);
-            _w.Line($"public List<{model}> {property} {{ get; set; }}");
+            // 数组元素也可能是 $ref 到基本类型(同 WriteField 中的"字符串枚举别名"逻辑)。
+            if (IsPrimitiveAlias(items))
+            {
+                _w.Line($"public List<{TypeMapper.Scalar(items.Kind(), items.Format)}> {property} {{ get; set; }}");
+            }
+            else
+            {
+                var model = _models.Register(items);
+                _w.Line($"public List<{model}> {property} {{ get; set; }}");
+            }
         }
         else if (items.Kind() == SchemaType.Object)
         {
